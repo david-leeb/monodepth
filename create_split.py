@@ -3,7 +3,7 @@ from nuscenes.nuscenes import NuScenes
 
 # CONFIG
 dataroot = "nuscenes_data" 
-version = "v1.0-trainval"  # <--- CHANGED FROM MINI
+version = "v1.0-trainval"
 split_name = "nuscenes_full"
 
 print(f"Loading nuScenes {version} database... this takes time!")
@@ -14,36 +14,41 @@ os.makedirs(f"splits/{split_name}", exist_ok=True)
 train_lines = []
 val_lines = []
 
-# NuScenes officially separates scenes into 'train' and 'val'
-# We should respect that to avoid data leakage
-total_scenes = len(nusc.scene)
-print(f"Processing {total_scenes} scenes...")
+# --- DEFINING THE CAMERAS (This was missing!) ---
+cameras = [
+    'CAM_FRONT', 'CAM_FRONT_LEFT', 'CAM_FRONT_RIGHT', 
+    'CAM_BACK', 'CAM_BACK_LEFT', 'CAM_BACK_RIGHT'
+]
+
+print(f"Processing {len(nusc.scene)} scenes...")
 
 for i, scene in enumerate(nusc.scene):
-    # Determine if this scene is in the official train or val split
-    # (Checking against official lists is safer, but for now we can infer 
-    # based on scene name or just split by index if you want a custom split.
-    # NuScenes doesn't explicitly flag 'train' vs 'val' in the scene dict easily 
-    # without looking up the split spec. 
-    # SIMPLE HACK: Use the first 80% for train, 20% for val)
-    
-    is_train = i < (total_scenes * 0.8)
+    # 1. Split Strategy: Every 5th scene goes to Validation
+    is_train = (i % 5 != 0)
     
     sample_token = scene['first_sample_token']
     while sample_token:
         sample = nusc.get('sample', sample_token)
         
-        # Check if we actually have the image file (in case you didn't download all blobs)
-        cam_data = nusc.get('sample_data', sample['data']['CAM_FRONT'])
-        if os.path.exists(os.path.join(dataroot, cam_data['filename'])):
-            line = f"CAM_FRONT {sample_token} l\n"
-            if is_train:
-                train_lines.append(line)
-            else:
-                val_lines.append(line)
+        # 2. Loop through ALL 6 cameras
+        for cam_name in cameras:
+            # Check if this sample has data for this camera
+            if cam_name in sample['data']:
+                cam_token = sample['data'][cam_name]
+                cam_data = nusc.get('sample_data', cam_token)
+                
+                # 3. Verify the file actually exists on disk (Blob 01 check)
+                if os.path.exists(os.path.join(dataroot, cam_data['filename'])):
+                    line = f"{cam_name} {sample_token} l\n"
+                    
+                    if is_train:
+                        train_lines.append(line)
+                    else:
+                        val_lines.append(line)
         
         sample_token = sample['next']
 
+# Save files
 with open(f"splits/{split_name}/train_files.txt", "w") as f:
     f.writelines(train_lines)
 with open(f"splits/{split_name}/val_files.txt", "w") as f:

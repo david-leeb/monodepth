@@ -1,4 +1,4 @@
-from .resnet_encoder import ResnetEncoder
+from .resnet_encoder import ResnetEncoder, ResnetEncoderMatching
 from .depth_decoder import DepthDecoder
 from .depth_decoder_HR import HRDepthDecoder
 from .pose_decoder import PoseDecoder

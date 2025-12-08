@@ -34,7 +34,7 @@ class MonodepthOptions:
         self.parser.add_argument("--split",
                                  type=str,
                                  help="which training split to use",
-                                 choices=["eigen_zhou", "eigen_full", "odom", "benchmark"],
+                                 choices=["nuscenes_full","eigen_zhou", "eigen_full", "odom", "benchmark"],
                                  default="eigen_zhou")
         self.parser.add_argument("--num_layers",
                                  type=int,
@@ -83,13 +83,56 @@ class MonodepthOptions:
                                  help="frames to load",
                                  default=[0, -1, 1])
 
-     	# DEPTH HINT options
+        # DEPTH HINT options
         self.parser.add_argument("--use_depth_hints",
                                  help="if set, apply depth hints during training",
                                  action="store_true")
         self.parser.add_argument("--depth_hint_path",
                                  help="path to load precomputed depth hints from. If not set will be assumed to be data_path/depth_hints",
                                  type=str)
+
+        # MANYDEPTH options
+        self.parser.add_argument("--manydepth",
+                                 help="if set, uses ManyDepth training procedure",
+                                 action="store_true")
+        self.parser.add_argument("--depth_binning",
+                                help="defines how the depth bins are constructed for the cost volume. "
+                                    "'linear' is uniformly sampled in depth space, "
+                                    "'inverse' is uniformly sampled in inverse depth space",
+                                type=str,
+                                choices=['linear', 'inverse'],
+                                default='linear')
+        self.parser.add_argument("--num_depth_bins",
+                                type=int,
+                                default=96)
+        self.parser.add_argument("--freeze_teacher_and_pose",
+                                action="store_true",
+                                help="If set, freeze the weights of the single frame teacher network and pose network.")
+        self.parser.add_argument("--freeze_teacher_epoch",
+                                type=int,
+                                default=15,
+                                help="Sets the epoch number at which to freeze the teacher network and the pose network.")
+        self.parser.add_argument("--freeze_teacher_step",
+                                type=int,
+                                default=-1,
+                                help="Sets the step number at which to freeze the teacher network.")
+        self.parser.add_argument('--use_future_frame',
+                                action='store_true',
+                                help='If set, will also use a future frame in time for matching.')
+        self.parser.add_argument('--num_matching_frames',
+                                help='Sets how many previous frames to load to build the cost volume',
+                                type=int,
+                                default=1)
+        self.parser.add_argument("--disable_motion_masking",
+                                help="If set, will not apply consistency loss in regions where the cost volume is deemed untrustworthy",
+                                action="store_true")
+        self.parser.add_argument("--no_matching_augmentation",
+                                action='store_true',
+                                help="If set, will not apply static camera augmentation or zero cost volume augmentation during training")
+        self.parser.add_argument("--mono_weights_folder",
+                                type=str,
+                                help="Path to a pretrained monocular model (teacher) to load")
+
 
         # OPTIMIZATION options
         self.parser.add_argument("--batch_size",
@@ -215,6 +258,17 @@ class MonodepthOptions:
                                  help="if set will perform the flipping post processing "
                                       "from the original monodepth paper",
                                  action="store_true")
+        self.parser.add_argument("--zero_cost_volume",
+                                 action="store_true",
+                                 help="If set, during evaluation all poses will be set to 0, and "
+                                      "so we will evaluate the model in single frame mode")
+        self.parser.add_argument('--static_camera',
+                                 action='store_true',
+                                 help='If set, during evaluation the current frame will also be'
+                                      'used as the lookup frame, to simulate a static camera')
+        self.parser.add_argument('--eval_teacher',
+                                 action='store_true',
+                                 help='If set, the teacher network will be evaluated')
 
     def parse(self):
         self.options = self.parser.parse_args()

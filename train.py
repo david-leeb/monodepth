@@ -7,6 +7,7 @@
 from __future__ import absolute_import, division, print_function
 
 from trainer import Trainer
+from trainer_manydepth import Trainer_ManyDepth
 from options import MonodepthOptions
 
 options = MonodepthOptions()
@@ -14,5 +15,8 @@ opts = options.parse()
 
 
 if __name__ == "__main__":
-    trainer = Trainer(opts)
+    if opts.manydepth:
+        trainer = Trainer_ManyDepth(opts)
+    else:
+        trainer = Trainer(opts)
     trainer.train()

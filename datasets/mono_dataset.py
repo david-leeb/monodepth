@@ -58,7 +58,7 @@ class MonoDataset(data.Dataset):
         self.height = height
         self.width = width
         self.num_scales = num_scales
-        self.interp = Image.ANTIALIAS
+        self.interp = Image.LANCZOS
 
         self.frame_idxs = frame_idxs
 
@@ -167,12 +167,34 @@ class MonoDataset(data.Dataset):
         else:
             side = None
 
+        poses = {}
         for i in self.frame_idxs:
             if i == "s":
                 other_side = {"r": "l", "l": "r"}[side]
                 inputs[("color", i, -1)] = self.get_color(folder, frame_index, other_side, do_flip)
             else:
-                inputs[("color", i, -1)] = self.get_color(folder, frame_index + i, side, do_flip)
+                # Check if frame index would be negative
+                target_frame_index = frame_index + i
+                if target_frame_index < 0:
+                    if i != 0:
+                        # Use the first frame instead of dummy data
+                        inputs[("color", i, -1)] = self.get_color(folder, 0, side, do_flip)
+                        poses[i] = None
+                    else:
+                        raise ValueError(f'Reference frame index is negative: {target_frame_index}')
+                else:
+                    try:
+                        inputs[("color", i, -1)] = self.get_color(
+                            folder, target_frame_index, side, do_flip)
+                    except FileNotFoundError as e:
+                        if i != 0:
+                            # fill with dummy values or first frame
+                            inputs[("color", i, -1)] = self.get_color(folder, 0, side, do_flip)
+                            poses[i] = None
+                        else:
+                            raise FileNotFoundError(f'Cannot find frame - make sure your '
+                                                f'--data_path is set correctly, or try adding'
+                                                f' the --png flag. {e}')
 
         # adjusting intrinsics to match each scale in the pyramid
         for scale in range(self.num_scales):
@@ -210,29 +232,6 @@ class MonoDataset(data.Dataset):
             stereo_T[0, 3] = side_sign * baseline_sign * 0.1
 
             inputs["stereo_T"] = torch.from_numpy(stereo_T)
-
-            # load depth hint
-            if self.use_depth_hints:
-                side_folder = 'image_02' if side == 'l' else 'image_03'
-                depth_folder = os.path.join(self.depth_hint_path, folder, side_folder,
-                                            str(frame_index).zfill(10) + '.npy')
-
-                try:
-                    depth = np.load(depth_folder)[0]
-                except FileNotFoundError:
-                    raise FileNotFoundError("Warning - cannot find depth hint for {} {} {}! "
-                                            "Either specify the correct path in option "
-                                            "--depth_hint_path, or run precompute_depth_hints.py to"
-                                            "train with depth hints".format(folder, side_folder,
-                                                                            frame_index))
-
-                if do_flip:
-                    depth = np.fliplr(depth)
-
-                depth = cv2.resize(depth, dsize=(self.width, self.height),
-                                   interpolation=cv2.INTER_NEAREST)
-                inputs['depth_hint'] = torch.from_numpy(depth).float().unsqueeze(0)
-                inputs['depth_hint_mask'] = (inputs['depth_hint'] > 0).float()
 
         return inputs
 

@@ -57,7 +57,9 @@ class Trainer:
                                               "--use_depth_hints."
 
         self.models["encoder"] = networks.ResnetEncoder(
-            self.opt.num_layers, self.opt.weights_init == "pretrained")
+            self.opt.num_layers, 
+            self.opt.weights_init == "pretrained"
+        )
         self.models["encoder"].to(self.device)
         self.parameters_to_train += list(self.models["encoder"].parameters())
 
@@ -122,7 +124,7 @@ class Trainer:
 
         # data
         datasets_dict = {"kitti": datasets.KITTIRAWDataset,
-                         "kitti_odom": datasets.KITTIOdomDataset
+                         "kitti_odom": datasets.KITTIOdomDataset,
                          "nuscenes": datasets.NuScenesDataset
                          }
         self.dataset = datasets_dict[self.opt.dataset]
@@ -531,9 +533,9 @@ class Trainer:
                     identity_reprojection_loss = identity_reprojection_losses.mean(1, keepdim=True)
                 else:
                     # save both images, and do min all at once below
-                    # identity_reprojection_loss = identity_reprojection_losses
+                    identity_reprojection_loss = identity_reprojection_losses
                     # differently to Monodepth2, compute mins as we go
-                    identity_reprojection_loss, _ = torch.min(identity_reprojection_losses, dim=1,
+                    # identity_reprojection_loss, _ = torch.min(identity_reprojection_losses, dim=1,
                                                               keepdim=True)
 
             else:
@@ -555,66 +557,29 @@ class Trainer:
             if self.opt.avg_reprojection:
                 reprojection_loss = reprojection_losses.mean(1, keepdim=True)
             else:
-                # reprojection_loss = reprojection_losses
+                reprojection_loss = reprojection_losses
                 # differently to Monodepth2, compute mins as we go
-                reprojection_loss, _ = torch.min(reprojection_losses, dim=1, keepdim=True)
+                # reprojection_loss, _ = torch.min(reprojection_losses, dim=1, keepdim=True)
 
             if not self.opt.disable_automasking:
                 # add random numbers to break ties
                 identity_reprojection_loss += torch.randn(
                     identity_reprojection_loss.shape, device=self.device) * 0.00001
 
-            #     combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
-            # else:
-            #     combined = reprojection_loss
+                combined = torch.cat((identity_reprojection_loss, reprojection_loss), dim=1)
+            else:
+                combined = reprojection_loss
 
-            # if combined.shape[1] == 1:
-            #     to_optimise = combined
-            # else:
-            #     to_optimise, idxs = torch.min(combined, dim=1)
+            if combined.shape[1] == 1:
+                to_optimise = combined
+            else:
+                to_optimise, idxs = torch.min(combined, dim=1)
 
-            # if not self.opt.disable_automasking:
-            #     outputs["identity_selection/{}".format(scale)] = (
-            #         idxs > identity_reprojection_loss.shape[1] - 1).float()
+            if not self.opt.disable_automasking:
+                outputs["identity_selection/{}".format(scale)] = (
+                    idxs > identity_reprojection_loss.shape[1] - 1).float()
 
-            # loss += to_optimise.mean()
-
-            # mean_disp = disp.mean(2, True).mean(3, True)
-            # norm_disp = disp / (mean_disp + 1e-7)
-            # smooth_loss = get_smooth_loss(norm_disp, color)
-
-            # loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
-            # total_loss += loss
-            # losses["loss/{}".format(scale)] = loss
-
-            # find minimum losses from [reprojection, identity, depth hints reprojection]
-            reprojection_loss_mask, depth_hint_loss_mask = \
-                self.compute_loss_masks(reprojection_loss,
-                                        identity_reprojection_loss,
-                                        depth_hint_reproj_loss)
-
-            # standard reprojection loss
-            reprojection_loss = reprojection_loss * reprojection_loss_mask
-            reprojection_loss = reprojection_loss.sum() / (reprojection_loss_mask.sum() + 1e-7)
-
-            outputs["identity_selection/{}".format(scale)] = (1 - reprojection_loss_mask).float()
-            losses['reproj_loss/{}'.format(scale)] = reprojection_loss
-
-            # proxy supervision loss
-            depth_hint_loss = 0
-            if self.opt.use_depth_hints:
-                target = inputs['depth_hint']
-                pred = outputs[('depth', 0, scale)]
-                valid_pixels = inputs['depth_hint_mask']
-
-                depth_hint_loss = self.compute_proxy_supervised_loss(pred, target, valid_pixels,
-                                                                     depth_hint_loss_mask)
-                depth_hint_loss = depth_hint_loss.sum() / (depth_hint_loss_mask.sum() + 1e-7)
-                # save for logging
-                outputs["depth_hint_pixels/{}".format(scale)] = depth_hint_loss_mask
-                losses['depth_hint_loss/{}'.format(scale)] = depth_hint_loss
-
-            loss += reprojection_loss + depth_hint_loss
+            loss += to_optimise.mean()
 
             mean_disp = disp.mean(2, True).mean(3, True)
             norm_disp = disp / (mean_disp + 1e-7)
@@ -623,6 +588,43 @@ class Trainer:
             loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
+
+            # find minimum losses from [reprojection, identity, depth hints reprojection]
+            # reprojection_loss_mask, depth_hint_loss_mask = \
+            #     self.compute_loss_masks(reprojection_loss,
+            #                             identity_reprojection_loss,
+            #                             depth_hint_reproj_loss)
+
+            # standard reprojection loss
+            # reprojection_loss = reprojection_loss * reprojection_loss_mask
+            # reprojection_loss = reprojection_loss.sum() / (reprojection_loss_mask.sum() + 1e-7)
+
+            # outputs["identity_selection/{}".format(scale)] = (1 - reprojection_loss_mask).float()
+            # losses['reproj_loss/{}'.format(scale)] = reprojection_loss
+
+            # # proxy supervision loss
+            # depth_hint_loss = 0
+            # if self.opt.use_depth_hints:
+            #     target = inputs['depth_hint']
+            #     pred = outputs[('depth', 0, scale)]
+            #     valid_pixels = inputs['depth_hint_mask']
+
+            #     depth_hint_loss = self.compute_proxy_supervised_loss(pred, target, valid_pixels,
+            #                                                          depth_hint_loss_mask)
+            #     depth_hint_loss = depth_hint_loss.sum() / (depth_hint_loss_mask.sum() + 1e-7)
+            #     # save for logging
+            #     outputs["depth_hint_pixels/{}".format(scale)] = depth_hint_loss_mask
+            #     losses['depth_hint_loss/{}'.format(scale)] = depth_hint_loss
+
+            # loss += reprojection_loss + depth_hint_loss
+
+            # mean_disp = disp.mean(2, True).mean(3, True)
+            # norm_disp = disp / (mean_disp + 1e-7)
+            # smooth_loss = get_smooth_loss(norm_disp, color)
+
+            # loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
+            # total_loss += loss
+            # losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss
@@ -708,7 +710,7 @@ class Trainer:
                 elif not self.opt.disable_automasking:
                     writer.add_image(
                         "automask_{}/{}".format(s, j),
-                        outputs["identity_selection/{}".format(s)][j][None, ...], self.step)
+                        outputs["identity_selection/{}".format(s)][j], self.step) # small update change here
 
                 # depth hint logging
                 if self.opt.use_depth_hints:
@@ -720,7 +722,7 @@ class Trainer:
 
                         writer.add_image(
                             "depth_hint_pixels_{}/{}".format(s, j),
-                            outputs["depth_hint_pixels/{}".format(s)][j][None, ...], self.step)
+                            outputs["depth_hint_pixels/{}".format(s)][j], self.step) # small update here
 
     def save_opts(self):
         """Save options to disk so we know what we ran this experiment with
