@@ -535,8 +535,7 @@ class Trainer:
                     # save both images, and do min all at once below
                     identity_reprojection_loss = identity_reprojection_losses
                     # differently to Monodepth2, compute mins as we go
-                    # identity_reprojection_loss, _ = torch.min(identity_reprojection_losses, dim=1,
-                                                              keepdim=True)
+                    # identity_reprojection_loss, _ = torch.min(identity_reprojection_losses, dim=1,keepdim=True)
 
             else:
                 identity_reprojection_loss = None
@@ -588,43 +587,6 @@ class Trainer:
             loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
             total_loss += loss
             losses["loss/{}".format(scale)] = loss
-
-            # find minimum losses from [reprojection, identity, depth hints reprojection]
-            # reprojection_loss_mask, depth_hint_loss_mask = \
-            #     self.compute_loss_masks(reprojection_loss,
-            #                             identity_reprojection_loss,
-            #                             depth_hint_reproj_loss)
-
-            # standard reprojection loss
-            # reprojection_loss = reprojection_loss * reprojection_loss_mask
-            # reprojection_loss = reprojection_loss.sum() / (reprojection_loss_mask.sum() + 1e-7)
-
-            # outputs["identity_selection/{}".format(scale)] = (1 - reprojection_loss_mask).float()
-            # losses['reproj_loss/{}'.format(scale)] = reprojection_loss
-
-            # # proxy supervision loss
-            # depth_hint_loss = 0
-            # if self.opt.use_depth_hints:
-            #     target = inputs['depth_hint']
-            #     pred = outputs[('depth', 0, scale)]
-            #     valid_pixels = inputs['depth_hint_mask']
-
-            #     depth_hint_loss = self.compute_proxy_supervised_loss(pred, target, valid_pixels,
-            #                                                          depth_hint_loss_mask)
-            #     depth_hint_loss = depth_hint_loss.sum() / (depth_hint_loss_mask.sum() + 1e-7)
-            #     # save for logging
-            #     outputs["depth_hint_pixels/{}".format(scale)] = depth_hint_loss_mask
-            #     losses['depth_hint_loss/{}'.format(scale)] = depth_hint_loss
-
-            # loss += reprojection_loss + depth_hint_loss
-
-            # mean_disp = disp.mean(2, True).mean(3, True)
-            # norm_disp = disp / (mean_disp + 1e-7)
-            # smooth_loss = get_smooth_loss(norm_disp, color)
-
-            # loss += self.opt.disparity_smoothness * smooth_loss / (2 ** scale)
-            # total_loss += loss
-            # losses["loss/{}".format(scale)] = loss
 
         total_loss /= self.num_scales
         losses["loss"] = total_loss

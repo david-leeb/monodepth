@@ -21,11 +21,10 @@ from tensorboardX import SummaryWriter
 
 import json
 
-from .utils import readlines, sec_to_hm_str
-from .layers import SSIM, BackprojectDepth, Project3D, transformation_from_parameters, \
-    disp_to_depth, get_smooth_loss, compute_depth_errors
+from utils import readlines, sec_to_hm_str
+from layers import SSIM, BackprojectDepth, Project3D, transformation_from_parameters, disp_to_depth, get_smooth_loss, compute_depth_errors
 
-from manydepth import datasets, networks
+import datasets, networks
 import matplotlib.pyplot as plt
 
 
@@ -88,19 +87,25 @@ class Trainer_ManyDepth:
             depth_binning=self.opt.depth_binning, num_depth_bins=self.opt.num_depth_bins)
         self.models["encoder"].to(self.device)
 
-        self.models["depth"] = networks.DepthDecoder(
-            self.models["encoder"].num_ch_enc, self.opt.scales)
+        # Select decoder based on command-line argument
+        if self.opt.depth_decoder_type == "HR":
+            self.models["depth"] = networks.HRDepthDecoder(
+                self.models["encoder"].num_ch_enc, self.opt.scales)
+        else:
+            self.models["depth"] = networks.DepthDecoder(
+                self.models["encoder"].num_ch_enc, self.opt.scales)
         self.models["depth"].to(self.device)
 
         self.parameters_to_train += list(self.models["encoder"].parameters())
         self.parameters_to_train += list(self.models["depth"].parameters())
 
-        self.models["mono_encoder"] = \
-            networks.ResnetEncoder(18, self.opt.weights_init == "pretrained")
+        self.models["mono_encoder"] = networks.ResnetEncoder(18, self.opt.weights_init == "pretrained")
         self.models["mono_encoder"].to(self.device)
 
-        self.models["mono_depth"] = \
-            networks.DepthDecoder(self.models["mono_encoder"].num_ch_enc, self.opt.scales)
+        if self.opt.depth_decoder_type == "HR":
+            self.models["mono_depth"] = networks.HRDepthDecoder(self.models["mono_encoder"].num_ch_enc, self.opt.scales)
+        else:
+            self.models["mono_depth"] = networks.DepthDecoder(self.models["mono_encoder"].num_ch_enc, self.opt.scales)
         self.models["mono_depth"].to(self.device)
 
         if self.train_teacher_and_pose:
@@ -778,7 +783,7 @@ class Trainer_ManyDepth:
                     "consistency_mask/{}".format(j),
                     consistency_mask, self.step)
 
-                consistency_target = colormap(outputs["consistency_target/0"][j])
+                consistency_target = colormap(outputs["consistency_target/0"][j, 0])
                 writer.add_image(
                     "consistency_target/{}".format(j),
                     consistency_target, self.step)

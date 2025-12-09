@@ -120,8 +120,7 @@ def evaluate(opt):
                                                encoder_dict['height'], encoder_dict['width'],
                                                frames_to_load, 4,
                                                is_train=False, img_ext=".png" if opt.png else ".jpg")
-        dataloader = DataLoader(dataset, opt.batch_size, shuffle=False, num_workers=opt.num_workers,
-                                pin_memory=True, drop_last=False)
+        dataloader = DataLoader(dataset, opt.batch_size, shuffle=False, num_workers=opt.num_workers, pin_memory=True, drop_last=False)
 
         # setup models
         if opt.eval_teacher:
@@ -157,7 +156,11 @@ def evaluate(opt):
                 pose_dec.cuda()
 
         encoder = encoder_class(**encoder_opts)
-        depth_decoder = networks.DepthDecoder(encoder.num_ch_enc)
+        # Setup decoder based on flag
+        if opt.depth_decoder_type == "HR":
+            depth_decoder = networks.HRDepthDecoder(encoder.num_ch_enc)
+        else:
+            depth_decoder = networks.DepthDecoder(encoder.num_ch_enc)
 
         model_dict = encoder.state_dict()
         encoder.load_state_dict({k: v for k, v in encoder_dict.items() if k in model_dict})

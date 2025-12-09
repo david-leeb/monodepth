@@ -217,6 +217,9 @@ class MonodepthOptions:
                                  type=int,
                                  help="number of epochs between each save",
                                  default=1)
+        self.parser.add_argument("--save_intermediate_models",
+                                 help="if set, save the model each time we log to tensorboard",
+                                 action='store_true')
 
         # EVALUATION options
         self.parser.add_argument("--eval_stereo",
