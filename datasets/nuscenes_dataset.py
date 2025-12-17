@@ -4,7 +4,7 @@ import numpy as np
 import torch
 import PIL.Image as pil
 from torchvision import transforms
-from nuscenes.nuscenes import NuScenes
+# from nuscenes.nuscenes import NuScenes
 from .mono_dataset import MonoDataset
 
 # Global cache to prevent reloading NuScenes database on every worker

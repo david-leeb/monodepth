@@ -53,7 +53,7 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
     velo2cam = np.vstack((velo2cam, np.array([0, 0, 0, 1.0])))
 
     # get image shape
-    im_shape = cam2cam["S_rect_02"][::-1].astype(np.int32)
+    im_shape = cam2cam["S_rect_02"][::-1].astype(int)
 
     # compute projection matrix velodyne->image plane
     R_cam2rect = np.eye(4)
@@ -83,7 +83,7 @@ def generate_depth_map(calib_dir, velo_filename, cam=2, vel_depth=False):
 
     # project to image
     depth = np.zeros((im_shape[:2]))
-    depth[velo_pts_im[:, 1].astype(np.int), velo_pts_im[:, 0].astype(np.int)] = velo_pts_im[:, 2]
+    depth[velo_pts_im[:, 1].astype(int), velo_pts_im[:, 0].astype(int)] = velo_pts_im[:, 2]
 
     # find the duplicate points and choose the closest depth
     inds = sub2ind(depth.shape, velo_pts_im[:, 1], velo_pts_im[:, 0])

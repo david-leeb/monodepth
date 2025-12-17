@@ -83,14 +83,6 @@ class MonodepthOptions:
                                  help="frames to load",
                                  default=[0, -1, 1])
 
-        # DEPTH HINT options
-        self.parser.add_argument("--use_depth_hints",
-                                 help="if set, apply depth hints during training",
-                                 action="store_true")
-        self.parser.add_argument("--depth_hint_path",
-                                 help="path to load precomputed depth hints from. If not set will be assumed to be data_path/depth_hints",
-                                 type=str)
-
         # MANYDEPTH options
         self.parser.add_argument("--manydepth",
                                  help="if set, uses ManyDepth training procedure",
