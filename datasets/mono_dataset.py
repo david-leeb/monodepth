@@ -154,18 +154,7 @@ class MonoDataset(data.Dataset):
         do_color_aug = self.is_train and random.random() > 0.5
         do_flip = self.is_train and random.random() > 0.5
 
-        line = self.filenames[index].split()
-        folder = line[0]
-
-        if len(line) == 3:
-            frame_index = int(line[1])
-        else:
-            frame_index = 0
-
-        if len(line) == 3:
-            side = line[2]
-        else:
-            side = None
+        folder, frame_index, side = self.index_to_folder_and_frame_idx(index)
 
         poses = {}
         for i in self.frame_idxs:
