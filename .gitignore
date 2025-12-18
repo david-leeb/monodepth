@@ -7,3 +7,4 @@ kitti_data
 models
 corrupted_kitti
 nuscenes_data
+nuscenes_320x192

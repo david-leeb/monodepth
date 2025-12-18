@@ -672,7 +672,7 @@ class Trainer:
                 elif not self.opt.disable_automasking:
                     writer.add_image(
                         "automask_{}/{}".format(s, j),
-                        outputs["identity_selection/{}".format(s)][j], self.step) # small update change here
+                        outputs["identity_selection/{}".format(s)][j].unsqueeze(0), self.step) # small update change here
 
                 # depth hint logging
                 if self.opt.use_depth_hints:

@@ -144,7 +144,8 @@ class Trainer_ManyDepth:
         # DATA
         datasets_dict = {"kitti": datasets.KITTIRAWDataset,
                          "cityscapes_preprocessed": datasets.CityscapesPreprocessedDataset,
-                         "kitti_odom": datasets.KITTIOdomDataset}
+                         "kitti_odom": datasets.KITTIOdomDataset,
+                         "nuscenes": datasets.NuScenesDataset}
         self.dataset = datasets_dict[self.opt.dataset]
 
         fpath = os.path.join("splits", self.opt.split, "{}_files.txt")
@@ -698,18 +699,37 @@ class Trainer_ManyDepth:
         min_depth = 1e-3
         max_depth = 80
 
+
         depth_pred = outputs[("depth", 0, 0)]
+        depth_gt = inputs["depth_gt"]
+
+        # Get dynamic resolution from the ground truth instead of hardcoded KITTI values
+        _, _, H, W = depth_gt.shape 
+        
         depth_pred = torch.clamp(F.interpolate(
-            depth_pred, [375, 1242], mode="bilinear", align_corners=False), 1e-3, 80)
+            depth_pred, [H, W], mode="bilinear", align_corners=False), 1e-3, 80)
         depth_pred = depth_pred.detach()
+
+
+        #depth_pred = outputs[("depth", 0, 0)]
+        #depth_pred = torch.clamp(F.interpolate(
+        #    depth_pred, [375, 1242], mode="bilinear", align_corners=False), 1e-3, 80)
+        #depth_pred = depth_pred.detach()
 
         depth_gt = inputs["depth_gt"]
         mask = (depth_gt > min_depth) * (depth_gt < max_depth)
 
-        # garg/eigen crop
-        crop_mask = torch.zeros_like(mask)
-        crop_mask[:, :, 153:371, 44:1197] = 1
-        mask = mask * crop_mask
+       # # garg/eigen crop
+       # crop_mask = torch.zeros_like(mask)
+       # crop_mask[:, :, 153:371, 44:1197] = 1
+       # mask = mask * crop_mask
+
+        # garg/eigen crop (only for KITTI)
+        if self.opt.dataset == "kitti":
+            crop_mask = torch.zeros_like(mask)
+            crop_mask[:, :, 153:371, 44:1197] = 1
+            mask = mask * crop_mask
+
 
         depth_gt = depth_gt[mask]
         depth_pred = depth_pred[mask]

@@ -23,6 +23,9 @@ class NuScenesDataset(MonoDataset):
             _NUSC_CACHE[version] = NuScenes(version=version, dataroot=self.data_path, verbose=False)
         
         self.nusc = _NUSC_CACHE[version]
+        
+        self.full_res_shape = (1600, 900) # (Width, Height)
+
 
     def get_image_path(self, cam_name, sample_token):
         sample = self.nusc.get('sample', sample_token)
@@ -56,8 +59,52 @@ class NuScenesDataset(MonoDataset):
         
         return K
 
+
+
+    def get_depth(self, folder, frame_index, side, do_flip):
+        # 1. Get tokens for the Camera and the closest Lidar scan
+        sample = self.nusc.get('sample', frame_index)
+        cam_token = sample['data'][folder]
+        lidar_token = sample['data']['LIDAR_TOP']
+
+        # 2. Project Lidar to Camera using the standard SDK function
+        # This returns the 3D points in the camera's image coordinates
+        points, _, _ = self.nusc.explorer.map_pointcloud_to_image(
+            pointsensor_token=lidar_token,
+            camera_token=cam_token,
+            render_intensity=False,
+            show_lidarseg=False,
+            filter_lidarseg_labels=None,
+            lidarseg_preds_bin_path=None,
+            show_panoptic=False
+        )
+
+        # 3. Create the blank depth map
+        # NuScenes images are typically 1600x900
+        cam_record = self.nusc.get('sample_data', cam_token)
+        orig_h, orig_w = cam_record['height'], cam_record['width']
+        
+        depth_gt = np.zeros((orig_h, orig_w), dtype=np.float32)
+        
+        # 4. Fill the depth map
+        # points[0] = x, points[1] = y, points[2] = depth
+        pts_x = points[0, :].astype(np.int32)
+        pts_y = points[1, :].astype(np.int32)
+        pts_d = points[2, :]
+
+        # Filter out points that fall outside the image bounds
+        valid_mask = (pts_x >= 0) & (pts_x < orig_w) & (pts_y >= 0) & (pts_y < orig_h)
+        
+        depth_gt[pts_y[valid_mask], pts_x[valid_mask]] = pts_d[valid_mask]
+
+        if do_flip:
+            depth_gt = np.fliplr(depth_gt)
+
+        return depth_gt
+
+
     def check_depth(self):
-        return False
+        return True
 
     def __getitem__(self, index):
         inputs = {}
